@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-P5yzFxKTEW9rGXqGB7UnSxAxHqUrrPEWOM0ua+lI3Zc='; style-src 'self' 'sha256-oFb6yCj7JeZnBsw0OZ48f+jXBe1u/HRd8sUAloEZdNg='; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>ART SCAN · Live-Kamera</title><style>:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20323c;background:#f1f5f5;font-size:16px}*{box-sizing:border-box}body{margin:0}header{background:white;border-bottom:1px solid #d5e0e2;padding:18px 20px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}header strong{font-size:25px;letter-spacing:.12em}header span{color:#617a84;font-size:12px}main{max-width:850px;margin:18px auto;padding:0 12px}.card{background:white;border:1px solid #d6e1e3;border-radius:16px;padding:19px;margin:12px 0;box-shadow:0 3px 15px #102e3210}h1,h2{font-size:21px;margin:0 0 12px}p{line-height:1.5;color:#415b63}.hint{font-size:14px;color:#627b83}button,a{font:inherit;border:0;border-radius:10px;padding:12px 15px;background:#e7eeee;color:#264851;text-decoration:none;cursor:pointer;display:inline-block}button.primary{background:#2b6876;color:white;font-weight:650}.controls{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}button:disabled{opacity:.55}video{background:#172a30;width:100%;max-height:53vh;min-height:145px;object-fit:contain;border-radius:11px}details{margin-top:12px}pre{white-space:pre-wrap;word-break:break-word;background:#eef3f4;padding:12px;border-radius:8px;font-size:12px;max-height:220px;overflow:auto}.frames{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.frames canvas{display:block;width:100%;height:auto;background:#172a30;border-radius:9px;touch-action:manipulation;border:2px solid #c9dadd}.frames label{font-weight:650;display:block;margin-bottom:5px}.frames canvas.active{border-color:#25aa90}select,input{width:100%;padding:10px;border-radius:9px;border:1px solid #b5c7cb;font:inherit;background:white}label{font-size:14px;font-weight:600;display:block;margin:12px 0 6px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.result{margin:14px 0;background:#ecf4f5;border-radius:12px;padding:17px;line-height:1.5}.result.good{background:#eaf5ef;color:#194f43}.result.error{background:#fff2eb;color:#843a20}footer{text-align:center;color:#67828b;font-size:12px;padding:20px 12px}@media(max-width:540px){.card{padding:15px}.frames{gap:7px}.controls button{flex:1}h1,h2{font-size:19px}}
+</style></head>
+<body><header><strong>ART SCAN</strong><span>LIVE-MESSLABOR · v1.4</span></header><main>
+<section class="card"><h1>1 · Kamera starten</h1><p>Diese HTTPS-Seite verwendet die rückwärtige iPhone-Kamera außerhalb des Google-Apps-Script-Fensters. Die Bilder werden hier <strong>nicht auf einen Server übertragen</strong>.</p>
+<div class="controls"><button id="start" class="primary">Live-Kamera starten</button><button id="motion">Bewegungssensoren freigeben</button><button id="stop">Beenden</button></div>
+<p id="status" role="status" aria-live="polite">Bereit</p><video id="video" autoplay muted playsinline></video>
+<p class="hint">iOS Safari fragt möglicherweise nach Kamerazugriff. Bewegungssensoren benötigen eine eigene Freigabe. Das iPhone langsam seitlich bewegen, nicht nur drehen.</p>
+<details><summary>Verfügbare Sensorinformationen</summary><pre id="debug">Noch nicht gestartet.</pre></details></section>
+<section class="card"><h2>2 · Zwei Perspektiven erfassen</h2><p>Bild 1 frontal erfassen, iPhone seitlich verschieben, Bild 2 erfassen. Die zweite Ansicht dokumentiert die Parallaxe, liefert aber <strong>allein keine verlässlichen Zentimeter</strong>.</p>
+<div class="controls"><button id="snap1">Ansicht 1 aufnehmen</button><button id="snap2">Ansicht 2 aufnehmen</button><button id="reset">Punkte zurücksetzen</button></div>
+<label for="which">Ecken markieren in</label><select id="which"><option value="painting1">Ansicht 1 · Gemälde (4 Punkte)</option><option value="reference1">Ansicht 1 · Referenz (4 Punkte)</option><option value="painting2">Ansicht 2 · Gemälde (optional)</option></select>
+<p class="hint">Immer in dieser Reihenfolge tippen: <strong>oben links → oben rechts → unten rechts → unten links</strong>. „Punkte zurücksetzen“ löscht nur die aktuell ausgewählte Markierung.</p>
+<div class="frames"><div><label>Ansicht 1</label><canvas id="frame1" width="640" height="480"></canvas></div><div><label>Ansicht 2</label><canvas id="frame2" width="640" height="480"></canvas></div></div>
+<p id="points" role="status">Noch keine Punkte markiert.</p></section>
+<section class="card"><h2>3 · Zentimeter bestimmen</h2><p>Wenn du ein Referenzquadrat mit bekannter Größe in <strong>derselben Ebene</strong> wie die Gemäldefläche platzieren kannst, kann ART SCAN aus Ansicht 1 Breite und Höhe schätzen. Nicht auf das Kunstwerk kleben.</p>
+<div class="two"><label>Referenzbreite in cm<input id="refw" inputmode="decimal" type="number" value="10" min="0.1" step="0.1"></label><label>Referenzhöhe in cm<input id="refh" inputmode="decimal" type="number" value="10" min="0.1" step="0.1"></label></div>
+<button id="measure" class="primary">Breite und Höhe berechnen</button><div id="result" class="result">Noch kein Zentimetermaß berechnet.</div>
+<p class="hint">Die Referenz muss in der Ebene der gemessenen Fläche liegen. Die Wand hinter einem vorspringenden Rahmen liegt normalerweise <strong>nicht</strong> in derselben Ebene. Ohne bekannte Skala wird kein cm-Wert ausgegeben.</p></section>
+<section class="card"><h2>4 · Messbericht an ART SCAN übergeben</h2><p>Bericht als JSON auf dem iPhone speichern. Danach in der bestehenden ART-SCAN-Web-App die JSON-Datei importieren und <strong>erst dann</strong> das endgültige Inventarfoto aufnehmen.</p>
+<div class="controls"><button id="export" class="primary">Messbericht herunterladen</button><a id="back" href="https://script.google.com/macros/s/AKfycbxak7sq_xjFMmy4AlzIVh-mFvTFLp5jCTV0xaYDrRjKGdpGis9d0-O2A0D69O6JJK8CRQ/exec" rel="noreferrer">Zu ART SCAN (Drive)</a></div><p id="exportstatus" class="hint"></p></section>
+</main><footer>ART SCAN · Keine automatisch belegte cm-Genauigkeit · Rohbilder bleiben bis zum Verlassen dieser Seite im Browser</footer>
+<script type="module">/* ART SCAN geometry – standalone, no external libraries.
+ * Image coordinates are normalized [0,1] fractions. The reference quadrilateral
+ * MUST be coplanar with the object being measured for metric dimensions to hold.
+ */
+function solveLinear(A, b) {
+  const n = b.length, m = A.map((row,i)=>[...row,b[i]]);
+  for (let j=0;j<n;j++) {
+    let k=j; for (let i=j+1;i<n;i++) if(Math.abs(m[i][j])>Math.abs(m[k][j])) k=i;
+    if(Math.abs(m[k][j])<1e-11) throw new Error('Punkte geometrisch ungeeignet; erneut markieren.');
+    [m[k],m[j]]=[m[j],m[k]];
+    const pivot=m[j][j]; for(let c=j;c<=n;c++)m[j][c]/=pivot;
+    for(let i=0;i<n;i++) if(i!==j) {const f=m[i][j];for(let c=j;c<=n;c++)m[i][c]-=f*m[j][c];}
+  }
+  return m.map(r=>r[n]);
+}
+function imageToPlane(reference, widthCm, heightCm) {
+  if(!Array.isArray(reference)||reference.length!==4)throw new Error('Vier Referenzecken fehlen.');
+  if(!Number.isFinite(widthCm)||!Number.isFinite(heightCm)||widthCm<=0||heightCm<=0)throw new Error('Referenzgröße ungültig.');
+  const destination=[[0,0],[widthCm,0],[widthCm,heightCm],[0,heightCm]];
+  const A=[],b=[];
+  for(let i=0;i<4;i++) {
+    const [x,y]=reference[i], [u,v]=destination[i];
+    if(![x,y,u,v].every(Number.isFinite))throw new Error('Ungültige Eckpunkte.');
+    A.push([x,y,1,0,0,0,-u*x,-u*y]);b.push(u);
+    A.push([0,0,0,x,y,1,-v*x,-v*y]);b.push(v);
+  }
+  const h=solveLinear(A,b);
+  return function(point) {
+    const [x,y]=point, z=h[6]*x+h[7]*y+1;
+    if(!Number.isFinite(z)||Math.abs(z)<1e-9)throw new Error('Perspektivische Berechnung instabil.');
+    const u=(h[0]*x+h[1]*y+h[2])/z, v=(h[3]*x+h[4]*y+h[5])/z;
+    if(!Number.isFinite(u)||!Number.isFinite(v))throw new Error('Messpunkt nicht berechenbar.');
+    return [u,v];
+  };
+}
+function distance(a,b) { return Math.hypot(a[0]-b[0],a[1]-b[1]); }
+function polygonArea(p) {return 0.5*Math.abs(p.reduce((s,a,i)=>s+a[0]*p[(i+1)%p.length][1]-a[1]*p[(i+1)%p.length][0],0));}
+function measure(reference, artwork, widthCm, heightCm) {
+  if(!Array.isArray(artwork)||artwork.length!==4)throw new Error('Vier Gemäldeecken fehlen.');
+  if(polygonArea(reference)<0.00005||polygonArea(artwork)<0.00005)throw new Error('Eckpunkte überlagern sich.');
+  const project=imageToPlane(reference,widthCm,heightCm);
+  const p=artwork.map(project);
+  const widths=[distance(p[0],p[1]),distance(p[3],p[2])];
+  const heights=[distance(p[0],p[3]),distance(p[1],p[2])];
+  const w=(widths[0]+widths[1])/2, h=(heights[0]+heights[1])/2;
+  if(!(w>0&&h>0&&w<100000&&h<100000))throw new Error('Unplausibles Messergebnis.');
+  const widthDifference=Math.abs(widths[0]-widths[1]);
+  const heightDifference=Math.abs(heights[0]-heights[1]);
+  return {widthCm:Math.round(w*10)/10,heightCm:Math.round(h*10)/10,
+    widthEdgeDifferenceCm:Math.round(widthDifference*100)/100,
+    heightEdgeDifferenceCm:Math.round(heightDifference*100)/100,
+    method:'Referenz-Homographie (gemeinsame Ebene)',
+    quality:'referenzbasierte Schätzung – am Objekt ungeprüft',
+    uncertaintyCm:null, verified:false,
+    warning:'Nur gültig, wenn Referenz und gemessene Fläche koplanar sind. Kantenunterschiede sind KEINE Messunsicherheit.'};
+}
+
+
+
+const $=id=>document.getElementById(id);
+const points={painting1:[],reference1:[],painting2:[]};
+const snapshots=[null,null];
+const captureMetadata=[null,null];
+let stream=null,active=false,settings={},capabilities={},startedAt=null,measureResult=null;
+let motionCount=0,orientationCount=0,lastSample=0;
+const samples=[];const SAMPLE_LIMIT=180;
+let cameraError=null,sensorPermission='nicht angefragt';
+const round=(v,d=3)=>typeof v==='number'&&Number.isFinite(v)?Number(v.toFixed(d)):null;
+const n=v=>Number.isFinite(Number(v))?Number(v):null;
+function status(message,error=false) { $('status').textContent=message; $('status').style.color=error?'#ad3730':'#315d61'; }
+function safeSettings(obj) {
+  if(!obj)return {};
+  const output={};for(const k of ['width','height','frameRate','aspectRatio','facingMode','zoom','resizeMode']) {
+    const v=obj[k];if(['string','number','boolean'].includes(typeof v))output[k]=v;
+  } return output;
+}
+function showDebug() {
+  $('debug').textContent=JSON.stringify({active,cameraSettings:settings,cameraCapabilities:capabilities,
+    motionEvents:motionCount,orientationEvents:orientationCount,savedSamples:samples.length,
+    sensorPermission,cameraError,markedCorners:Object.fromEntries(Object.entries(points).map(([k,v])=>[k,v.length]))},null,2);
+}
+async function startCamera() {
+  if(active)return;
+  status('Rückkamera wird angefragt …');
+  if(!navigator.mediaDevices?.getUserMedia){status('getUserMedia ist hier nicht verfügbar. HTTPS/Safari prüfen.',true);return;}
+  try {
+    stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
+    $('video').srcObject=stream;
+    await $('video').play();
+    const track=stream.getVideoTracks()[0]; settings=safeSettings(track.getSettings?.());
+    capabilities=safeSettings(track.getCapabilities?.());
+    if(settings.facingMode==='user')status('ACHTUNG: Frontkamera aktiv. Bitte Rückkamera über Safari prüfen.',true);
+    else status('Live-Kamera aktiv. Jetzt Ansicht 1 aufnehmen.');
+    active=true;startedAt=startedAt||new Date().toISOString();cameraError=null;
+    track.addEventListener('ended',()=>{active=false;status('Kamerastream beendet. Erneut starten, wenn nötig.',true);showDebug();});
+  } catch (e) {cameraError={name:e.name||'Error',message:String(e.message||e)};status('Kamera nicht verfügbar: '+cameraError.name+' · '+cameraError.message,true);}
+  showDebug();
+}
+function stopCamera(){
+  if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;active=false;$('video').srcObject=null;
+  status('Kamera beendet. Aufgenommene Ansichten bleiben bis zum Schließen der Seite erhalten.');showDebug();
+}
+function onMotion(e) {
+  motionCount++;
+  const t=performance.now();if(t-lastSample<120)return;lastSample=t;
+  samples.push({tMs:Math.round(t),type:'motion',ax:round(e.acceleration?.x),ay:round(e.acceleration?.y),az:round(e.acceleration?.z),
+    gx:round(e.accelerationIncludingGravity?.x),gy:round(e.accelerationIncludingGravity?.y),gz:round(e.accelerationIncludingGravity?.z),
+    alpha:round(e.rotationRate?.alpha),beta:round(e.rotationRate?.beta),gamma:round(e.rotationRate?.gamma)});
+  if(samples.length>SAMPLE_LIMIT)samples.shift();
+  if(motionCount%15===0)showDebug();
+}
+function onOrientation(e){
+  orientationCount++;
+  if(orientationCount%5===0){const t=performance.now();if(t-lastSample>150){lastSample=t;
+    samples.push({tMs:Math.round(t),type:'orientation',alpha:round(e.alpha),beta:round(e.beta),gamma:round(e.gamma),absolute:!!e.absolute});
+    if(samples.length>SAMPLE_LIMIT)samples.shift();}}
+  if(orientationCount%15===0)showDebug();
+}
+async function enableSensors(){
+  try {
+    if(typeof DeviceMotionEvent!=='undefined'&&typeof DeviceMotionEvent.requestPermission==='function'){
+      const a=await DeviceMotionEvent.requestPermission();if(a!=='granted')throw new Error('Bewegungssensoren: '+a);
+    }
+    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      const a=await DeviceOrientationEvent.requestPermission();if(a!=='granted')throw new Error('Ausrichtung: '+a);
+    }
+    window.removeEventListener('devicemotion',onMotion);window.removeEventListener('deviceorientation',onOrientation);
+    window.addEventListener('devicemotion',onMotion,{passive:true});
+    window.addEventListener('deviceorientation',onOrientation,{passive:true});
+    sensorPermission='angefordert/erlaubt';startedAt=startedAt||new Date().toISOString();
+    status('Sensoren angefragt. Bewege das Gerät und prüfe die Ereigniszähler.');
+  } catch(e){sensorPermission='verweigert: '+String(e.message||e);status(sensorPermission,true);}
+  showDebug();
+}
+function paint(index) {
+  const canvas=$('frame'+(index+1)),ctx=canvas.getContext('2d');
+  const shot=snapshots[index];ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(shot)ctx.drawImage(shot,0,0,canvas.width,canvas.height);
+  else {ctx.fillStyle='#172a30';ctx.fillRect(0,0,canvas.width,canvas.height);}
+  const groups=index===0?[['painting1','#5ae6bc'],['reference1','#ffd873']]:[['painting2','#5ae6bc']];
+  for(const [key,color] of groups){const p=points[key];ctx.fillStyle=color;ctx.strokeStyle=color;ctx.lineWidth=Math.max(2,canvas.width/360);
+    if(p.length>=2){ctx.beginPath();ctx.moveTo(p[0][0]*canvas.width,p[0][1]*canvas.height);
+      p.slice(1).forEach(q=>ctx.lineTo(q[0]*canvas.width,q[1]*canvas.height));if(p.length===4)ctx.closePath();ctx.stroke();}
+    p.forEach(([x,y],i)=>{const X=x*canvas.width,Y=y*canvas.height;ctx.beginPath();ctx.arc(X,Y,Math.max(5,canvas.width/110),0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#18333a';ctx.font=`bold ${Math.max(12,canvas.width/44)}px sans-serif`;ctx.textAlign='center';ctx.fillText(String(i+1),X,Y+4);ctx.fillStyle=color;});
+  }
+  canvas.classList.toggle('active',Number($('which').value.endsWith('2')?1:0)===index);
+}
+function info(){const name=$('which').selectedOptions[0].textContent;
+  $('points').textContent=`${name} · ${points[$('which').value].length}/4 Punkte · ${snapshots[0]?'Ansicht 1 vorhanden':'Ansicht 1 fehlt'} · ${snapshots[1]?'Ansicht 2 vorhanden':'Ansicht 2 fehlt'}`;
+  paint(0);paint(1);showDebug();
+}
+function capture(index){
+  const video=$('video');if(!active||!video.videoWidth){status('Erst Live-Kamera starten.',true);return;}
+  const max=1280, w=Math.min(max,video.videoWidth),h=Math.round(video.videoHeight*w/video.videoWidth);
+  const img=document.createElement('canvas');img.width=w;img.height=h;
+  img.getContext('2d',{alpha:false}).drawImage(video,0,0,w,h);
+  snapshots[index]=img;
+  captureMetadata[index]={capturedAt:new Date().toISOString(),monotonicMs:Math.round(performance.now()),
+    cameraSettings:{...settings},originalVideoWidth:video.videoWidth,originalVideoHeight:video.videoHeight};
+  points[index===0?'painting1':'painting2']=[];
+  if(index===0)points.reference1=[];
+  measureResult=null;
+  const canvas=$('frame'+(index+1));canvas.width=w;canvas.height=h;
+  $('which').value=index===0?'painting1':'painting2';
+  status('Ansicht '+(index+1)+' gespeichert. Vier Gemäldeecken markieren.');info();
+}
+function addPoint(index,evt){
+  const k=$('which').value;
+  if((k.endsWith('2')?1:0)!==index){$('which').value=index===0?'painting1':'painting2';info();}
+  const chosen=$('which').value;
+  if(!snapshots[index]){status('Erst diese Ansicht aufnehmen.',true);return;}
+  const rect=evt.currentTarget.getBoundingClientRect();
+  const x=(evt.clientX-rect.left)/rect.width,y=(evt.clientY-rect.top)/rect.height;
+  if(x<0||y<0||x>1||y>1)return;
+  if(points[chosen].length>=4){status('Vier Punkte vorhanden. Zum Korrigieren „Punkte zurücksetzen“.');return;}
+  points[chosen].push([round(x,6),round(y,6)]);
+  measureResult=null;info();
+}
+function resetPoints(){points[$('which').value]=[];measureResult=null;info();status('Ausgewählte Eckpunkte gelöscht.');}
+function calculate(){
+  const el=$('result');
+  try {
+    if(!snapshots[0])throw new Error('Ansicht 1 fehlt.');
+    if(points.painting1.length!==4||points.reference1.length!==4)throw new Error('Vier Gemälde- und vier Referenzecken in Ansicht 1 markieren.');
+    const w=Number($('refw').value),h=Number($('refh').value);
+    measureResult=measure(points.reference1,points.painting1,w,h);
+    el.className='result good';el.textContent=`Breite ${measureResult.widthCm.toFixed(1)} cm · Höhe ${measureResult.heightCm.toFixed(1)} cm. Referenzbasierte Schätzung – NICHT am Objekt geprüft. Kantenvergleich: ${measureResult.widthEdgeDifferenceCm} cm / ${measureResult.heightEdgeDifferenceCm} cm (keine Messunsicherheit).`;
+    status('Referenzmessung berechnet. Der Messwert muss praktisch überprüft werden.');
+  }catch(e){measureResult=null;el.className='result error';el.textContent='Keine belastbare cm-Messung: '+e.message;status(e.message,true);}
+}
+function buildReport(){
+  const frame=(i)=>({index:i+1,present:!!snapshots[i],width:snapshots[i]?.width||null,height:snapshots[i]?.height||null,...(captureMetadata[i]||{})});
+  // Keep JSON under the existing private Apps Script diagnostic limit (45 kB).
+  const report={schema:'artscan-sensor-diagnostic-1',recordedAt:new Date().toISOString(),source:'standalone-https-iphone-camera-v1.4',
+    browserEnvironment:{userAgent:navigator.userAgent.slice(0,240),secure:window.isSecureContext},
+    cameraStatus:active?'streaming':'stopped',cameraError,cameraSettings:settings,cameraCapabilities:capabilities,
+    sensorPermission,sensorState:{motionCount,orientationCount},motionEventCount:motionCount,orientationEventCount:orientationCount,
+    samples:samples.slice(-150),frames:[frame(0),frame(1)],
+    corners:{painting1:points.painting1,reference1:points.reference1,painting2:points.painting2},
+    relativeView:{secondViewRecorded:!!snapshots[1],metricScaleFromMotion:false},
+    centimeterMeasurement:measureResult||{widthCm:null,heightCm:null,quality:'kein Maßstab – keine Zentimeterwerte',verified:false},
+    gpsCollected:false,imagesIncluded:false};
+  return report;
+}
+function exportJSON(){
+  if(!snapshots[0]){status('Bitte zuerst mindestens Ansicht 1 aufnehmen.',true);return;}
+  const report=buildReport();const content=JSON.stringify(report,null,2);
+  if(content.length>43000){status('Bericht zu groß. Bitte Test wiederholen.',true);return;}
+  const blob=new Blob([content],{type:'application/json'}),url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`ART_SCAN_Messung_${new Date().toISOString().replace(/[:.]/g,'-')}.json`;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),20000);
+  $('exportstatus').textContent='JSON wurde zum Download angeboten. Danach ART SCAN öffnen, Messbericht importieren und Inventarfoto aufnehmen.';
+}
+$('start').addEventListener('click',startCamera);
+$('stop').addEventListener('click',stopCamera);
+$('motion').addEventListener('click',enableSensors);
+$('snap1').addEventListener('click',()=>capture(0));$('snap2').addEventListener('click',()=>capture(1));
+$('reset').addEventListener('click',resetPoints);
+$('frame1').addEventListener('click',e=>addPoint(0,e));
+$('frame2').addEventListener('click',e=>addPoint(1,e));
+$('which').addEventListener('change',info);
+$('measure').addEventListener('click',calculate);
+$('export').addEventListener('click',exportJSON);
+window.addEventListener('pagehide',()=>{stopCamera();});
+info();
+</script></body></html>
